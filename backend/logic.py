@@ -10,6 +10,18 @@ CORRECT, PRESENT, ABSENT = "correct", "present", "absent"
 def _load(name: str) -> list[str]:
     return [w for w in DATA_DIR.joinpath(name).read_text().split() if w]
 
+def is_plural(word: str) -> bool:
+    if word in PLURAL_EXCEPTIONS:
+        return True
+    if word.endswith(("ss", "us", "is")):   # glass, virus, oasis
+        return False
+    return word.endswith("s")
+
+PLURAL_EXCEPTIONS = frozenset({
+    "menus", "taxis", "nazis", "iraqis", "israelis", "safaris",
+    "children", "people", "teeth", "women",
+})
+
 VALID_WORDS: frozenset[str] = frozenset(_load("valid_words.txt"))
 ANSWERS: dict[int, list[str]] = {n: [] for n in range(MIN_LENGTH, MAX_LENGTH + 1)}
 for _w in _load("answers.txt"):
