@@ -1,0 +1,78 @@
+import pytest
+from fastapi.testclient import TestClient
+
+import logic
+import store
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    monkeypatch.setattr(store, "DB_PATH", tmp_path / "test.db")
+    from main import app
+
+    with TestClient(app) as c:
+        yield c
+
+def new_game(client, n=5, answer="crane"):
+    # Pin the answer so outcomes are deterministic.
+    import main
+
+    main.logic.pick_answer = lambda length: answer if len(answer) == length else "x" * length
+    r = client.post("/games", json={"word_length": n})
+    assert r.status_code == 201
+    return r.json()
+
+def test_create_game_hides_answer(client):
+    g = new_game(client)
+    assert g["word_length"] == 5 and g["max_guesses"] == 6
+    assert g["status"] == "in_progress" and g["answer"] is None and g["guesses"] == []
+
+@pytest.mark.parametrize("n", [4, 9, 0, -1])
+def test_rejects_bad_word_length(client, n):
+    assert client.post("/games", json={"word_length": n}).status_code == 422
+
+def test_get_unknown_game_404(client):
+    assert client.get("/games/nope").status_code == 404
+    assert client.post("/games/nope/guesses", json={"guess": "crane"}).status_code == 404
+
+def test_guess_feedback_and_state(client):
+    g = new_game(client)
+    r = client.post(f"/games/{g['id']}/guesses", json={"guess": "NACRE"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["guesses"][0] == {
+        "word": "nacre",
+        "feedback": ["present", "present", "present", "present", "correct"],
+    }
+    assert client.get(f"/games/{g['id']}").json()["guesses"] == body["guesses"]
+
+@pytest.mark.parametrize("guess", ["cran", "cranes", "cr4ne", "     ", "zzzzz"])
+def test_invalid_guesses_rejected_and_not_counted(client, guess):
+    g = new_game(client)
+    assert client.post(f"/games/{g['id']}/guesses", json={"guess": guess}).status_code == 422
+    assert client.get(f"/games/{g['id']}").json()["guesses"] == []
+
+def test_win_reveals_answer_and_locks_game(client):
+    g = new_game(client)
+    body = client.post(f"/games/{g['id']}/guesses", json={"guess": "crane"}).json()
+    assert body["status"] == "won" and body["answer"] == "crane"
+    assert client.post(f"/games/{g['id']}/guesses", json={"guess": "pound"}).status_code == 409
+
+@pytest.mark.parametrize(
+    "n,answer,wrong", [(5, "crane", "pound"), (8, "abstract", "daughter")]
+)
+def test_loss_after_n_plus_one_guesses(client, n, answer, wrong):
+    g = new_game(client, n, answer)
+    for i in range(n + 1):
+        body = client.post(f"/games/{g['id']}/guesses", json={"guess": wrong}).json()
+        assert body["status"] == ("lost" if i == n else "in_progress")
+    assert body["answer"] == answer
+    assert len(body["guesses"]) == n + 1
+
+def test_multiple_games_are_independent_and_listed(client):
+    a = new_game(client, 5, "crane")
+    b = new_game(client, 6, "planet")
+    client.post(f"/games/{a['id']}/guesses", json={"guess": "pound"})
+    listing = client.get("/games").json()
+    by_id = {g["id"]: g for g in listing}
+    assert by_id[a["id"]]["guess_count"] == 1 and by_id[b["id"]]["guess_count"] == 0
+    assert "answer" not in by_id[a["id"]]

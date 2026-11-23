@@ -1,34 +1,60 @@
-import { useState, useEffect } from 'react'
-import './App.css'
+import { useEffect, useState } from "react";
+import { createGame } from "./api";
+import Game from "./components/Game";
+import Home from "./components/Home";
+import "./App.css";
 
-const API_URL = 'http://localhost:8000'
+const idFromHash = () => window.location.hash.slice(1) || null;
 
-function App() {
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(true)
+export default function App() {
+  const [gameId, setGameId] = useState(idFromHash);
+  const [homeKey, setHomeKey] = useState(0);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`${API_URL}/`)
-      .then((response) => response.json())
-      .then((data) => {
-        setMessage(data.message)
-        setLoading(false)
-      })
-      .catch((error) => {
-        console.error('Error fetching from API:', error)
-        setMessage('Failed to connect to API')
-        setLoading(false)
-      })
-  }, [])
+    const sync = () => {
+      setGameId(idFromHash());
+      setHomeKey((k) => k + 1);
+    };
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  const open = (id) => {
+    window.location.hash = id ?? "";
+  };
+
+  async function again(length) {
+    setError("");
+    try {
+      open((await createGame(length)).id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   return (
-    <>
-      <h1>Wordle</h1>
-      <div className="card">
-        <p>API Response: {loading ? 'Loading...' : message}</p>
-      </div>
-    </>
-  )
+    <main>
+      <h1>
+        <a href="#" onClick={() => open(null)}>
+          Wordle
+        </a>
+      </h1>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      {gameId ? (
+        <Game
+          key={gameId}
+          id={gameId}
+          onHome={() => open(null)}
+          onNewGame={again}
+        />
+      ) : (
+        <Home key={homeKey} onOpen={open} />
+      )}
+    </main>
+  );
 }
-
-export default App
