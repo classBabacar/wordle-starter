@@ -7,26 +7,16 @@ MIN_LENGTH, MAX_LENGTH = 5, 8
 
 CORRECT, PRESENT, ABSENT = "correct", "present", "absent"
 
-def _load(name: str) -> list[str]:
-    return [w for w in DATA_DIR.joinpath(name).read_text().split() if w]
+def load(name: str) -> list[str]:
+    return {w.strip().lower() for w in DATA_DIR.joinpath(name).read_text().split()}
 
-def is_plural(word: str) -> bool:
-    if word in PLURAL_EXCEPTIONS:
-        return True
-    if word.endswith(("ss", "us", "is")):   # glass, virus, oasis
-        return False
-    return word.endswith("s")
+_answers = load("answers.txt")
+VALID_WORDS: frozenset[str] = frozenset(load("valid_words.txt") | _answers)
 
-PLURAL_EXCEPTIONS = frozenset({
-    "menus", "taxis", "nazis", "iraqis", "israelis", "safaris",
-    "children", "people", "teeth", "women",
-})
-
-VALID_WORDS: frozenset[str] = frozenset(_load("valid_words.txt"))
 ANSWERS: dict[int, list[str]] = {n: [] for n in range(MIN_LENGTH, MAX_LENGTH + 1)}
-for _w in _load("answers.txt"):
-    if len(_w) in ANSWERS:
-        ANSWERS[len(_w)].append(_w)
+for w in sorted(_answers):
+    if len(w) in ANSWERS:
+        ANSWERS[len(w)].append(w)
 
 def max_guesses(word_length: int) -> int:
     return word_length + 1
