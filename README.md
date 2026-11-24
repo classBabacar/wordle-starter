@@ -19,7 +19,7 @@ You can play an online version of Wordle [here](https://www.nytimes.com/games/wo
 9. [x] **Multiple Games**: The user can create and play as many games as they want.
 10. [x] **Configurable Word Length**: The user can configure the number of letters in the target word to be anywhere between 5 to 8 letters, but they will always only have N+1 turns to guess the word. For instance, traditional Wordle involves guessing a five-letter word over six turns, but in our version, the user can pick 7 as the number of letters and get 8 turns to guess the word.
 
-# Design Choices
+## Design Choices
 
 **Q: Why SQLite?**
 
@@ -70,3 +70,14 @@ You can play an online version of Wordle [here](https://www.nytimes.com/games/wo
 3. Build your API endpoints in `backend/main.py`
 4. Build your UI in the `frontend/src/` directory
 5. The frontend is configured to make requests to `http://localhost:8000`
+
+## Run Tests
+
+1. Run tests in image `docker compose run --rm --no-deps backend sh -c "pip install -r requirements-dev.txt && pytest`
+2. Alternatively (Python Version 3+ on main machine):
+
+```
+cd backend
+pip install -r requirements-dev.txt   # first time only
+pytest
+```
