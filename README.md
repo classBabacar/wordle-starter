@@ -73,7 +73,7 @@ You can play an online version of Wordle [here](https://www.nytimes.com/games/wo
 
 ## Run Tests
 
-1. Run tests in image `docker compose run --rm --no-deps backend sh -c "pip install -r requirements-dev.txt && pytest`
+1. Run tests in image `docker compose run --rm --no-deps backend sh -c "pip install -r requirements-dev.txt && pytest` (Easist Option)
 2. Alternatively (Python Version 3+ on main machine):
 
 ```
