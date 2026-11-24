@@ -38,3 +38,7 @@ def test_answers_are_not_plural():
 
 def test_turn_limit_is_length_plus_one():
     assert [max_guesses(n) for n in range(5, 9)] == [6, 7, 8, 9]
+
+def test_score_guess_rejects_length_mismatch():
+    with pytest.raises(ValueError):
+        score_guess("cran", "crane")
