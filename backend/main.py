@@ -90,5 +90,8 @@ def submit_guess(game_id: str, body: NewGuess):
         status = LOST
     else:
         status = IN_PROGRESS
-    store.add_guess(game_id, used, guess, feedback, status)
+    try:
+        store.add_guess(game_id, used, guess, feedback, status)
+    except store.GuessConflict:
+        raise HTTPException(409, "Another guess was just submitted for this game. Please try again.")
     return public_game(load_game(game_id))

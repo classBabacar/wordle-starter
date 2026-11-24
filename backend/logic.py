@@ -35,7 +35,8 @@ def score_guess(guess: str, answer: str) -> list[str]:
     guess with two Es against an answer with one E yields one yellow/green E
     and one gray E.
     """
-    assert len(guess) == len(answer)
+    if len(guess) != len(answer):
+        raise ValueError("guess and answer must be the same length")
     result = [ABSENT] * len(guess)
     remaining: dict[str, int] = {}
     for i, (g, a) in enumerate(zip(guess, answer)):

@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS guesses (
 );
 """
 
-
 @contextmanager
 def connect():
     conn = sqlite3.connect(DB_PATH)
@@ -36,12 +35,10 @@ def connect():
     finally:
         conn.close()
 
-
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
-
 
 def create_game(word_length: int, answer: str) -> str:
     game_id = uuid.uuid4().hex
@@ -51,7 +48,6 @@ def create_game(word_length: int, answer: str) -> str:
             (game_id, word_length, answer),
         )
     return game_id
-
 
 def get_game(game_id: str) -> dict | None:
     """Return the game row plus its ordered guesses, or None."""
@@ -67,7 +63,6 @@ def get_game(game_id: str) -> dict | None:
     game["guesses"] = [{"word": g["word"], "feedback": g["feedback"].split(",")} for g in guesses]
     return game
 
-
 def list_games() -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
@@ -77,11 +72,29 @@ def list_games() -> list[dict]:
         ).fetchall()
     return [dict(r) for r in rows]
 
+class GuessConflict(Exception):
+    """The game changed (finished, or another guess landed) since it was read."""
 
 def add_guess(game_id: str, position: int, word: str, feedback: list[str], status: str) -> None:
+    """Append guess number `position` to a game, atomically.
+
+    The caller computed this guess from a game that had `position - 1` guesses and was
+    still in progress. BEGIN IMMEDIATE takes the write lock up front, and the guarded
+    UPDATE only matches if that is still true. Otherwise nothing is written and
+    GuessConflict is raised, so concurrent requests can never overrun the turn limit
+    or insert the same position twice.
+    """
     with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        updated = conn.execute(
+            """UPDATE games SET status = ?
+               WHERE id = ? AND status = 'in_progress'
+                 AND (SELECT COUNT(*) FROM guesses WHERE game_id = ?) = ?""",
+            (status, game_id, game_id, position - 1),
+        )
+        if updated.rowcount != 1:
+            raise GuessConflict
         conn.execute(
             "INSERT INTO guesses (game_id, position, word, feedback) VALUES (?, ?, ?, ?)",
             (game_id, position, word, ",".join(feedback)),
         )
-        conn.execute("UPDATE games SET status = ? WHERE id = ?", (status, game_id))
